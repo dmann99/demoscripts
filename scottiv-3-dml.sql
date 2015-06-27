@@ -1,0 +1,90 @@
+CONNECT SCOTTIV/tiger
+
+SET ECHO ON
+
+exec dbms_lock.sleep(120);
+
+-- Increase Salary by 10%
+SELECT * FROM EMP;
+UPDATE EMP SET SAL = SAL * 1.10;
+SELECT * FROM EMP;
+
+-- Relocate Sales Dept from Chicago to Miami
+SELECT * FROM DEPT;
+UPDATE DEPT SET LOC='MIAMI' WHERE DEPTNO=30;
+SELECT * FROM DEPT;
+
+COMMIT;
+
+-- Round 2 of changes - WAIT A FEW MINUTES BEFORE COMMITTING! 
+
+exec dbms_lock.sleep(120);
+
+-- Then set flat rate to 2000
+SELECT * FROM EMP;
+UPDATE EMP SET SAL=2000;
+SELECT * FROM EMP;
+
+-- Then Relocate Sales Dept from Miami to Hollwood
+SELECT * FROM DEPT;
+UPDATE DEPT SET LOC='HOLLYWOOD' WHERE DEPTNO=30;
+SELECT * FROM DEPT;
+COMMIT;
+
+-- Flashback Query
+
+-- Current
+SELECT * FROM DEPT;
+
+-- Original value - 6 minutes ago
+SELECT * FROM DEPT
+ AS OF TIMESTAMP (SYSTIMESTAMP - INTERVAL '6' MINUTE)
+;
+
+-- 3 minutes ago
+SELECT * FROM DEPT
+ AS OF TIMESTAMP (SYSTIMESTAMP - INTERVAL '3' MINUTE)
+ WHERE DEPTNO=30;
+
+-- 1 Minute ago
+SELECT * FROM DEPT
+ AS OF TIMESTAMP (SYSTIMESTAMP - INTERVAL '1' MINUTE)
+ WHERE DEPTNO=30;
+
+-- Joins are just as easy - 6 minutes ago
+SELECT * FROM EMP, DEPT  
+ AS OF TIMESTAMP (SYSTIMESTAMP - INTERVAL '6' MINUTE)
+ WHERE EMP.DEPTNO=DEPT.DEPTNO;
+
+-- 3 minutes ago
+SELECT * FROM EMP, DEPT
+ AS OF TIMESTAMP (SYSTIMESTAMP - INTERVAL '3' MINUTE)
+ WHERE EMP.DEPTNO=DEPT.DEPTNO;
+
+-- 1 minutes ago
+SELECT * FROM EMP, DEPT
+ AS OF TIMESTAMP (SYSTIMESTAMP - INTERVAL '1' MINUTE)
+ WHERE EMP.DEPTNO=DEPT.DEPTNO;
+
+
+-- Look for Transactions involving our tables
+DESC FLASHBACK_TRANSACTION_QUERY
+ 
+SELECT * 
+  FROM FLASHBACK_TRANSACTION_QUERY 
+ WHERE LOGON_USER='SCOTTIV'
+   AND TABLE_NAME IN ('EMP','DEPT')
+   ORDER BY START_TIMESTAMP, UNDO_CHANGE#;
+
+-- Show details about Blake's Salary data change history
+  SELECT versions_xid XID, 
+         versions_startscn START_SCN,
+         versions_endscn END_SCN, 
+         versions_operation OPERATION,
+         EMP.* 
+    FROM emp
+VERSIONS BETWEEN SCN MINVALUE AND MAXVALUE
+   WHERE empno = 7698
+   ORDER BY START_SCN NULLS FIRST;
+
+SELECT * FROM DBA_FLASHBACK_ARCHIVE_TABLES;
